@@ -14,32 +14,40 @@ import org.typelevel.log4cats.slf4j.*
 object Http4sClient extends IOApp.Simple {
 
   import Attributes.*
-
-  def getReqPagedAttributes[F[_] : Concurrent](client: Client[F])(using logger: Logger[F]): F[PageResponse] = {
+  import TokenManagement.*
+  
+  def postReqCreateToken[F[_] : Concurrent](client: Client[F])(using logger: Logger[F]): F[KeycloakTokenResponse] = {
     client
-      .expect[PageResponse](getReq)(jsonOf[F, PageResponse])
+      .expect[KeycloakTokenResponse](postReq2CreateToken)(jsonOf[F, KeycloakTokenResponse])
+      .map { (res: KeycloakTokenResponse) => logger.info("create token") >> res.pure
+      }.flatMap(r => r)
+  }
+
+  def getReqPagedAttributes[F[_] : Concurrent](client: Client[F], token: KeycloakTokenResponse)(using logger: Logger[F]): F[PageResponse] = {
+    client
+      .expect[PageResponse](getReq(token))(jsonOf[F, PageResponse])
       .map((res: PageResponse) => {
         logger.info("handle attributes get request") >> logger.info(s"Response $res") >> res.pure
       }).flatMap(r => r)
   }
 
-  def postReqAttribute[F[_] : Concurrent](client: Client[F])(using logger: Logger[F]): F[Attribute] = {
+  def postReqAttribute[F[_] : Concurrent](client: Client[F], token: KeycloakTokenResponse)(using logger: Logger[F]): F[Attribute] = {
     client
-      .expect[Attribute](postReq)(jsonOf[F, Attribute])
+      .expect[Attribute](postReq(token))(jsonOf[F, Attribute])
       .map((res: Attribute) => {
         logger.info("handle attribute post request") >> logger.info(s"Response $res") >> res.pure
       }).flatMap(r => r)
   }
 
-  def handleAttributes[F[_] : Concurrent](client: Client[F])(using logger: Logger[F]): F[Unit] = for {
+  def handleAttributes[F[_] : Concurrent](client: Client[F], token: KeycloakTokenResponse)(using logger: Logger[F]): F[Unit] = for {
     _ <- client
-          .expect[PageResponse](getReq)(jsonOf[F, PageResponse])
+          .expect[PageResponse](getReq(token))(jsonOf[F, PageResponse])
           .flatMap((res: PageResponse) => {
             logger.info("handle attributes get request") >> logger.info(s"Response $res")
           })
 
     _ <- client
-          .expect[Attribute](postReq)(jsonOf[F, Attribute])
+          .expect[Attribute](postReq(token))(jsonOf[F, Attribute])
           .flatMap((res: Attribute) => {
             logger.info("handle attribute post request") >> logger.info(s"Response $res")
           })
@@ -84,9 +92,10 @@ object Http4sClient extends IOApp.Simple {
       .withLogger(logger)
       .build
       .use((client: Client[F]) => for {
-           _ <- handleAttributes(client)
-           _ <- getReqPagedAttributes(client)
-           _ <- postReqAttribute(client)
+           token <- postReqCreateToken(client) 
+           _ <- handleAttributes(client, token)
+           _ <- getReqPagedAttributes(client, token)
+           _ <- postReqAttribute(client, token)
         } yield ()
       )
     builder
