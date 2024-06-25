@@ -15,7 +15,7 @@ object Http4sClient extends IOApp.Simple {
 
   import Attributes.*
   import TokenManagement.*
-  
+
   def postReqCreateToken[F[_] : Concurrent](client: Client[F])(using logger: Logger[F]): F[KeycloakTokenResponse] = {
     client
       .expect[KeycloakTokenResponse](postReq2CreateToken)(jsonOf[F, KeycloakTokenResponse])
@@ -53,35 +53,6 @@ object Http4sClient extends IOApp.Simple {
           })
   } yield ().pure
 
-  /*
-    override def run[F[_] : Async : Network]: F[Nothing] =
-
-      EmberClientBuilder
-        .default[F]
-        //      .withLogger(logger)
-        .build
-        .map { client => {
-          val pageResponse: F[PageResponse] = getReqPagedAttributes(client)
-          (client, pageResponse)
-        }
-        }
-        .map { case (client, pageResponse) => {
-          val attribute: F[Attribute] = postReqAttribute(client)
-          (client, pageResponse, attribute)
-        }
-        }
-        .map { case (client, pageResponse, attribute) => {
-          val finalHttpApp: HttpApp[F] = Logger.httpApp(true, true)(httpApp);
-        }
-
-        }
-        .flatMap { case (client, pageResponse, attribute) => {
-
-        }
-        }
-        .useForever
-  */
-
   def program[F[_] : Async : Network]: F[Unit] = {
 
     given logger: Logger[F] = Slf4jFactory.create[F].getLogger
@@ -92,7 +63,7 @@ object Http4sClient extends IOApp.Simple {
       .withLogger(logger)
       .build
       .use((client: Client[F]) => for {
-           token <- postReqCreateToken(client) 
+           token <- postReqCreateToken(client)
            _ <- handleAttributes(client, token)
            _ <- getReqPagedAttributes(client, token)
            _ <- postReqAttribute(client, token)
@@ -101,6 +72,6 @@ object Http4sClient extends IOApp.Simple {
     builder
   }
 
-  override def run: IO[Unit] = program[IO] // forwards to the run method above (Line 88 ff.)
+  override def run: IO[Unit] = program[IO] // forwards to the run method above (Line 56 ff.)
 
 }
